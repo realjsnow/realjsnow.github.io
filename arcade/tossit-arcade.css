@@ -1,0 +1,908 @@
+.tossit-arcade {
+    /* Keep the game's z-index stack (screen 1, hud 2, poster 4) inside this
+       section. Nothing between the poster and the root created a stacking
+       context, so its z-index: 4 was competing with the page and beating the
+       sticky header's z-index: 3 - the game window painted over the nav as
+       you scrolled past it. */
+    isolation: isolate;
+    /* a cabinet is not a document: nothing in here should highlight, and it
+       kills the blue drag-select flash on touch too */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    padding: var(--ta-pt) 16px var(--ta-pb);
+    background: var(--ta-bg);
+    --ta-ink: #17141b;
+    --ta-accent: var(--ta-accent-set);
+    --ta-cream: #f6efdd;
+    --ta-soft: rgba(246, 239, 221, 0.66);
+    --ta-faint: rgba(246, 239, 221, 0.42);
+  }
+
+  .tossit-arcade .ta-shell {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-right: 10px;
+    padding-bottom: 10px;
+  }
+
+  /* same sticker construction as the giveaway banner, dark instead of yellow */
+  .tossit-arcade .ta-card {
+    position: relative;
+    overflow: visible;
+    background: var(--ta-card);
+    /* stepped corners: a pixel staircase instead of a smooth radius */
+    clip-path: polygon(
+      0 12px, 6px 12px, 6px 6px, 12px 6px, 12px 0,
+      calc(100% - 12px) 0, calc(100% - 12px) 6px, calc(100% - 6px) 6px,
+      calc(100% - 6px) 12px, 100% 12px,
+      100% calc(100% - 12px), calc(100% - 6px) calc(100% - 12px),
+      calc(100% - 6px) calc(100% - 6px), calc(100% - 12px) calc(100% - 6px),
+      calc(100% - 12px) 100%,
+      12px 100%, 12px calc(100% - 6px), 6px calc(100% - 6px),
+      6px calc(100% - 12px), 0 calc(100% - 12px)
+    );
+    border: 0;
+    border-radius: 0;
+    /* concentric hard rings read as moulded cabinet trim */
+    box-shadow:
+      inset 0 0 0 3px var(--ta-accent-set),
+      inset 0 0 0 9px #17141b,
+      inset 0 0 0 12px rgba(237, 189, 0, 0.35);
+  }
+
+  .tossit-arcade .ta-card__body {
+    padding: clamp(20px, 3vw, 30px) clamp(16px, 2.6vw, 34px) clamp(16px, 2.4vw, 26px);
+  }
+
+  .tossit-arcade .ta-card__head {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+
+  .tossit-arcade .ta-eyebrow {
+    display: inline-block;
+    margin: 0 0 14px;
+    padding: 7px 18px;
+    background: var(--ta-accent);
+    color: var(--ta-ink);
+    border: 3px solid var(--ta-ink);
+    border-radius: 999px;
+    box-shadow: 4px 4px 0 var(--ta-ink);
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .tossit-arcade .ta-heading {
+    margin: 0;
+    font-family: var(--font-heading-family, 'Bebas Neue', Impact, sans-serif);
+    font-weight: 400;
+    font-size: clamp(36px, 5.4vw, 64px);
+    line-height: 0.94;
+    letter-spacing: 0.015em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    color: var(--ta-cream);
+  }
+
+  .tossit-arcade .ta-sub {
+    margin: 14px auto 0;
+    max-width: 48ch;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: clamp(14px, 1.3vw, 16px);
+    line-height: 1.7;
+    color: var(--ta-soft);
+  }
+
+  .tossit-arcade .ta-screen {
+    position: relative;
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #241d33;
+    border: 4px solid var(--ta-ink);
+    border-radius: 16px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  @supports not (aspect-ratio: 1) {
+    .tossit-arcade .ta-screen {
+      height: 0;
+      padding-bottom: 56.25%;
+    }
+  }
+
+  .tossit-arcade .ta-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  .tossit-arcade .ta-sound-wrap {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tossit-arcade .ta-sound__label {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(23, 20, 27, 0.72);
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--ta-accent);
+    pointer-events: none;
+  }
+
+  .tossit-arcade .ta-sound-wrap[data-muted='false'] .ta-sound__label {
+    color: rgba(246, 239, 221, 0.5);
+  }
+
+  .tossit-arcade .ta-sound {
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--ta-ink);
+    background: var(--ta-accent);
+    color: var(--ta-ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 3px 3px 0 var(--ta-ink);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .tossit-arcade .ta-sound__icon {
+    display: flex;
+    width: 16px;
+    height: 16px;
+  }
+
+  .tossit-arcade .ta-sound__icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .tossit-arcade .ta-sound:hover {
+    transform: translate(1px, 1px);
+    box-shadow: 2px 2px 0 var(--ta-ink);
+  }
+
+  .tossit-arcade .ta-sound[data-muted='true'] {
+    background: var(--ta-cream);
+    color: #8b8578;
+  }
+
+  .tossit-arcade .ta-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(23, 20, 27, 0.78);
+  }
+
+  .tossit-arcade .ta-overlay[hidden] {
+    display: none;
+  }
+
+  .tossit-arcade .ta-panel {
+    text-align: center;
+    max-width: 420px;
+    padding: clamp(20px, 3vw, 28px) clamp(20px, 3vw, 32px);
+    background: var(--ta-card);
+    border: 4px solid var(--ta-ink);
+    border-radius: 20px;
+    box-shadow: 7px 7px 0 var(--ta-accent);
+  }
+
+  .tossit-arcade .ta-rank {
+    display: inline-block;
+    margin-bottom: 10px;
+    padding: 5px 14px;
+    background: var(--ta-accent);
+    color: var(--ta-ink);
+    border: 3px solid var(--ta-ink);
+    border-radius: 999px;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .tossit-arcade .ta-panel__title {
+    margin: 0 0 10px;
+    font-family: var(--font-heading-family, 'Bebas Neue', Impact, sans-serif);
+    font-weight: 400;
+    font-size: clamp(36px, 5.4vw, 56px);
+    line-height: 0.94;
+    letter-spacing: 0.015em;
+    text-transform: uppercase;
+    color: var(--ta-cream);
+  }
+
+  .tossit-arcade .ta-panel__body {
+    margin: 0 auto 20px;
+    max-width: 32ch;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ta-soft);
+  }
+
+  .tossit-arcade .ta-btn {
+    -webkit-tap-highlight-color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 5px;
+    padding: 14px 32px;
+    background: var(--ta-accent);
+    color: var(--ta-ink);
+    border: 3px solid var(--ta-ink);
+    border-radius: 999px;
+    box-shadow: 5px 5px 0 var(--ta-ink);
+    cursor: pointer;
+    text-decoration: none;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .tossit-arcade .ta-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 3px 3px 0 var(--ta-ink);
+  }
+
+  .tossit-arcade .ta-btn--ghost {
+    background: var(--ta-cream);
+  }
+
+  .tossit-arcade .ta-panel__foot {
+    margin-top: 12px;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ta-faint);
+  }
+
+  .tossit-arcade .ta-hint {
+    margin: 16px 0 0;
+    text-align: center;
+    font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ta-faint);
+  }
+
+  .tossit-arcade .ta-hint b {
+    font-weight: 800;
+    color: var(--ta-accent);
+  }
+
+  @media screen and (max-width: 749px) {
+    /* a square playfield on phones */
+    .tossit-arcade .ta-screen {
+      aspect-ratio: 1 / 1;
+    }
+
+    @supports not (aspect-ratio: 1) {
+      .tossit-arcade .ta-screen {
+        padding-bottom: 100%;
+      }
+    }
+
+    .tossit-arcade .ta-shell {
+      padding-right: 6px;
+      padding-bottom: 6px;
+    }
+
+    .tossit-arcade .ta-card {
+      box-shadow: 6px 6px 0 var(--ta-accent);
+    }
+
+    .tossit-arcade .ta-card__body {
+      padding: 22px 14px 20px;
+    }
+
+    /*
+      The panel was a fixed 420px inside a ~400px screen, so it covered the
+      scene entirely and left the poster showing as two slivers down the sides.
+    */
+    .tossit-arcade .ta-panel {
+      max-width: min(420px, 86%);
+      padding: 16px 16px 18px;
+      border-width: 3px;
+      box-shadow: 5px 5px 0 var(--ta-accent);
+    }
+
+    .tossit-arcade .ta-panel__title {
+      font-size: clamp(28px, 8.4vw, 40px);
+    }
+
+    .tossit-arcade .ta-panel__body {
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .tossit-arcade .ta-overlay,
+    .tossit-arcade .ta-poster {
+      padding: 12px;
+    }
+
+    .tossit-arcade .ta-btn {
+      padding: 13px 24px;
+      font-size: 12px;
+    }
+
+    /* 36px is below the 44px minimum tap target */
+    .tossit-arcade .ta-sound {
+      width: 44px;
+      height: 44px;
+    }
+
+    .tossit-arcade .ta-sound__icon {
+      width: 19px;
+      height: 19px;
+    }
+
+    /* keep the last line clear of a floating chat bubble */
+    .tossit-arcade .ta-hint {
+      padding: 0 44px 0 8px;
+    }
+  }
+
+/* ---------------------------------------------------- poster + loading */
+
+.tossit-arcade .ta-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.tossit-arcade .ta-poster[hidden] {
+  display: none;
+}
+
+.tossit-arcade .ta-poster__img,
+.tossit-arcade .ta-poster__fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* stands in when no poster image is set */
+.tossit-arcade .ta-poster__fallback {
+  background:
+    radial-gradient(ellipse at 54% 62%, rgba(237, 189, 0, 0.5) 0%, rgba(237, 189, 0, 0) 46%),
+    linear-gradient(180deg, #241748 0%, #6c2a5e 58%, #c04a35 82%, #e8a021 100%);
+}
+
+.tossit-arcade .ta-poster__veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(23, 20, 27, 0.72);
+}
+
+.tossit-arcade .ta-poster__panel {
+  position: relative;
+  z-index: 1;
+}
+
+.tossit-arcade .ta-loading {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.tossit-arcade .ta-loading[hidden] {
+  display: none;
+}
+
+/* a Tossit dart tumbling end over end */
+.tossit-arcade .ta-loading__dart {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid var(--ta-accent);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  animation: ta-spin 0.9s linear infinite;
+}
+
+.tossit-arcade .ta-loading__text {
+  font-family: var(--font-body-family, 'Mulish', 'Muli', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ta-accent);
+}
+
+.tossit-arcade .ta-loading__bar {
+  width: 168px;
+  max-width: 60vw;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(246, 239, 221, 0.16);
+  overflow: hidden;
+}
+
+.tossit-arcade .ta-loading__bar i {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ta-accent);
+  animation: ta-sweep 1.15s ease-in-out infinite;
+}
+
+@keyframes ta-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ta-sweep {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(268%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tossit-arcade .ta-loading__dart,
+  .tossit-arcade .ta-loading__bar i {
+    animation-duration: 3s;
+  }
+}
+
+/* --------------------------------------------------- mobile lightbox */
+
+.tossit-arcade .ta-close {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 7;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--ta-ink);
+  background: var(--ta-accent);
+  color: var(--ta-ink);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ta-scroll-lock,
+.ta-scroll-lock body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.tossit-arcade .ta-machine.ta-lightbox-open {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: #17141b;
+}
+
+.tossit-arcade .ta-machine.ta-lightbox-open .ta-screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+@supports not (aspect-ratio: 1) {
+  .tossit-arcade .ta-machine.ta-lightbox-open .ta-screen {
+    padding-bottom: 0;
+  }
+}
+
+.tossit-arcade .ta-machine.ta-lightbox-open .ta-close {
+  display: block;
+}
+
+/* keep the close clear of the iPhone notch / home bar */
+@supports (padding: env(safe-area-inset-top)) {
+  .tossit-arcade .ta-machine.ta-lightbox-open .ta-close {
+    top: calc(10px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
+  }
+}
+
+.tossit-arcade .ta-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 7;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--ta-ink);
+  background: var(--ta-accent);
+  color: var(--ta-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tossit-arcade .ta-expand[hidden] {
+  display: none;
+}
+
+
+/* ------------------------------------------------ the cabinet fittings */
+
+.tossit-arcade .ta-marquee {
+  position: relative;
+  margin: 0 0 clamp(14px, 2vw, 22px);
+  padding: clamp(14px, 2vw, 22px) 16px clamp(12px, 1.8vw, 18px);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(237, 189, 0, 0.16), rgba(237, 189, 0, 0.03) 60%, transparent),
+    #12101a;
+  box-shadow:
+    inset 0 0 0 3px #17141b,
+    inset 0 0 0 6px rgba(237, 189, 0, 0.55),
+    0 5px 0 0 rgba(0, 0, 0, 0.5);
+  /* stepped corners again, smaller step */
+  clip-path: polygon(
+    0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px,
+    calc(100% - 4px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px),
+    calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px),
+    calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px),
+    4px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+
+/* scanlines across the marquee glass */
+.tossit-arcade .ta-marquee__glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.22) 0 2px,
+    rgba(255, 255, 255, 0.02) 2px 4px
+  );
+}
+
+.tossit-arcade .ta-marquee .ta-heading {
+  text-shadow: 0 3px 0 #17141b, 0 0 22px rgba(237, 189, 0, 0.45);
+}
+
+.tossit-arcade .ta-marquee .ta-eyebrow {
+  text-shadow: 0 2px 0 #17141b;
+}
+
+/* the tube sits in a moulded bezel */
+.tossit-arcade .ta-screen {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow:
+    0 0 0 6px #0a0910,
+    0 0 0 10px #241f2e,
+    0 0 0 13px rgba(237, 189, 0, 0.5),
+    inset 0 0 60px rgba(0, 0, 0, 0.55);
+}
+
+.tossit-arcade .ta-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------------------------------------------------- control panel */
+
+.tossit-arcade .ta-controls {
+  margin: clamp(20px, 2.6vw, 30px) 0 0;
+  padding: clamp(12px, 1.8vw, 18px) 16px clamp(10px, 1.4vw, 14px);
+  background: linear-gradient(180deg, #221d2c, #17141b);
+  box-shadow:
+    inset 0 0 0 3px #0a0910,
+    inset 0 3px 0 6px rgba(255, 255, 255, 0.04),
+    0 4px 0 0 rgba(0, 0, 0, 0.45);
+  clip-path: polygon(
+    0 6px, 6px 6px, 6px 0, calc(100% - 6px) 0, calc(100% - 6px) 6px, 100% 6px,
+    100% 100%, 0 100%
+  );
+}
+
+.tossit-arcade .ta-controls__deck {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 12px;
+}
+
+.tossit-arcade .ta-stick {
+  position: relative;
+  width: 22px;
+  height: 30px;
+}
+
+/* the dust washer sunk into the panel */
+.tossit-arcade .ta-stick::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 22px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0a0910;
+  box-shadow: 0 0 0 2px #3a3348;
+}
+
+/* the shaft */
+.tossit-arcade .ta-stick i {
+  position: absolute;
+  left: 8px;
+  bottom: 4px;
+  width: 6px;
+  height: 15px;
+  background: #3a3348;
+}
+
+/* the ball top */
+.tossit-arcade .ta-stick i::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -13px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e0503f;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.32), 0 0 0 2px #17141b;
+}
+
+.tossit-arcade .ta-btn-dot {
+  margin-bottom: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35), 0 0 0 2px #17141b;
+}
+
+.tossit-arcade .ta-btn-dot--a { background: var(--ta-accent-set); }
+.tossit-arcade .ta-btn-dot--b { background: #3f9d92; }
+.tossit-arcade .ta-btn-dot--c { background: #e0503f; }
+
+.tossit-arcade .ta-controls .ta-hint {
+  margin: 0;
+  padding: 0;
+}
+
+/* coin slot along the bottom rail */
+.tossit-arcade .ta-coin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 2px solid rgba(255, 255, 255, 0.06);
+}
+
+.tossit-arcade .ta-coin__slot {
+  width: 24px;
+  height: 6px;
+  background: #0a0910;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.8), 0 0 0 2px #3a3348;
+}
+
+.tossit-arcade .ta-coin__text {
+  font-family: var(--font-body-family, sans-serif);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(237, 189, 0, 0.75);
+  animation: ta-coin-blink 1.6s steps(1) infinite;
+}
+
+@keyframes ta-coin-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tossit-arcade .ta-coin__text { animation: none; }
+}
+
+@media screen and (max-width: 749px) {
+  /* The section padding settings are tuned for desktop; on a phone they
+     stack with the next section's top padding and leave a dead gap under
+     the cabinet. Override the padding property rather than the --ta-pt /
+     --ta-pb vars, which are set inline and would need !important. */
+  .tossit-arcade { padding: 28px 16px 20px; }
+
+  .tossit-arcade .ta-controls__deck { gap: 11px; }
+  .tossit-arcade .ta-screen {
+    box-shadow:
+      0 0 0 4px #0a0910,
+      0 0 0 7px #241f2e,
+      0 0 0 9px rgba(237, 189, 0, 0.5),
+      inset 0 0 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* the lightbox is the bare tube, no cabinet around it */
+.tossit-arcade .ta-machine.ta-lightbox-open .ta-screen {
+  box-shadow: none;
+}
+
+/* ------------------------------------------------- the fullscreen stage */
+
+.tossit-arcade .ta-stage {
+  display: none;
+}
+
+.tossit-arcade .ta-stage[open] {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #17141b;
+  overscroll-behavior: contain;
+}
+
+.tossit-arcade .ta-stage::backdrop {
+  background: #17141b;
+}
+
+/* inside the stage the screen owns the whole surface, no cabinet bezel */
+.tossit-arcade .ta-stage .ta-screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@supports not (aspect-ratio: 1) {
+  .tossit-arcade .ta-stage .ta-screen {
+    padding-bottom: 0;
+  }
+}
+
+.tossit-arcade .ta-stage .ta-close {
+  display: block;
+}
+
+/* safe-area for the notch, same as the fallback path */
+@supports (padding: env(safe-area-inset-top)) {
+  .tossit-arcade .ta-stage .ta-close {
+    top: calc(10px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
+  }
+}
+
+/* fallback for browsers without <dialog>: while the lightbox is open the
+   card must not clip, transform, or contain the fixed overlay */
+.tossit-arcade .ta-card.ta-lb-host {
+  clip-path: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* -------------------------------------------- the heads-up start graphic */
+
+.tossit-arcade .ta-headsup {
+  position: relative;
+  width: min(46vw, 200px);
+  margin: 0 auto 6px;
+  animation: ta-head-float 3.2s ease-in-out infinite;
+}
+
+.tossit-arcade .ta-headsup__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.28));
+}
+
+/* the title rides ON the face, right across the dome */
+.tossit-arcade .ta-headsup__title {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  margin: 0;
+  white-space: nowrap;
+  text-shadow:
+    0 3px 0 #17141b,
+    -2px 0 0 #17141b,
+    2px 0 0 #17141b,
+    0 -2px 0 #17141b;
+}
+
+@keyframes ta-head-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-9px) rotate(2.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tossit-arcade .ta-headsup { animation: none; }
+}
+
+/* The section's loader script parks the poster's infinite loops while the
+   section is off screen (IntersectionObserver toggles ta-onscreen). Gated on
+   html.toss-ready — added by the section's inline parse-time script — so a
+   browser that never runs JS never matches :not(.ta-onscreen) and keeps
+   animating exactly as before. */
+.toss-ready .tossit-arcade:not(.ta-onscreen) .ta-headsup,
+.toss-ready .tossit-arcade:not(.ta-onscreen) .ta-coin__text {
+  animation-play-state: paused;
+}
