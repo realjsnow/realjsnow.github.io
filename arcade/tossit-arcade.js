@@ -510,6 +510,44 @@ window.TossitArcade.boot = function (root) {
     o.stop(t + 0.4);
   }
 
+  /* two yips, pitched off the dog's size: little dogs are shrill, big ones bark */
+  function sfxBark(hz) {
+    var a = audio();
+    if (!a) return;
+    var t = a.currentTime;
+    for (var i = 0; i < 2; i++) {
+      var ti = t + i * 0.17;
+      var o = a.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * 1.7, ti);
+      o.frequency.exponentialRampToValueAtTime(hz * 0.72, ti + 0.1);
+      /* the filter sweeping shut is the mouth closing on the end of the bark */
+      var bp = a.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(hz * 4.2, ti);
+      bp.frequency.exponentialRampToValueAtTime(hz * 1.6, ti + 0.11);
+      bp.Q.value = 1.4;
+      var g = a.createGain();
+      g.gain.setValueAtTime(0.0001, ti);
+      g.gain.exponentialRampToValueAtTime(0.2 - i * 0.05, ti + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0004, ti + 0.13);
+      o.connect(bp);
+      bp.connect(g);
+      g.connect(master);
+      o.start(ti);
+      o.stop(ti + 0.16);
+
+      var bn = noise(a);
+      var bhp = a.createBiquadFilter();
+      bhp.type = 'highpass';
+      bhp.frequency.value = 900;
+      bn.connect(bhp);
+      env(a, bhp, ti, 0.09, 0.004, 0.05);
+      bn.start(ti);
+      bn.stop(ti + 0.09);
+    }
+  }
+
   function sfxClang() {
     var a = audio();
     if (!a) return;
@@ -1387,19 +1425,25 @@ window.TossitArcade.boot = function (root) {
 
       if (roll > 0.55) {
         var bp = proj(bx, STREET_Y + CURB_H, bz);
+        /*
+          One cast-iron end frame each side, running the whole way from the
+          ground to the top rail, so the frames carry the back as well as the
+          seat. They go down before the slats: the slats then sit on them and
+          the ironwork only shows in the gap between seat and back, which is
+          how you actually see a park bench.
+        */
+        s.fillStyle = '#2b2536';
+        for (var u = 0; u < 2; u++) {
+          s.beginPath();
+          s.rect(bp.x + (u ? 49 : -58) * bs, bp.y - 88 * bs, 9 * bs, 88 * bs);
+          s.fill(); s.stroke();
+        }
         s.fillStyle = '#8a5a34';
         s.beginPath();
         s.rect(bp.x - 62 * bs, bp.y - 48 * bs, 124 * bs, 11 * bs);
         s.fill(); s.stroke();
         s.beginPath();
         s.rect(bp.x - 62 * bs, bp.y - 88 * bs, 124 * bs, 11 * bs);
-        s.fill(); s.stroke();
-        s.fillStyle = '#2b2536';
-        s.beginPath();
-        s.rect(bp.x - 58 * bs, bp.y - 48 * bs, 9 * bs, 48 * bs);
-        s.fill(); s.stroke();
-        s.beginPath();
-        s.rect(bp.x + 49 * bs, bp.y - 48 * bs, 9 * bs, 48 * bs);
         s.fill(); s.stroke();
       } else if (roll > 0.3) {
         var tp = proj(bx, STREET_Y + CURB_H, bz);
@@ -1475,6 +1519,46 @@ window.TossitArcade.boot = function (root) {
   var HAIR = ['bald', 'horseshoe', 'horseshoe', 'tufts', 'combover'];
   var MOPS_M = ['mop', 'slick', 'curly', 'cap', 'afro', 'flattop'];
   var MOPS_F = ['bob', 'pony', 'bun', 'longf', 'curlyf', 'braids'];
+
+  /*
+    Somebody on this block is always walking a dog. Height and body length are
+    in the same centimetres as everything else in the world, so a dachshund
+    reads as a dachshund at any depth without a single hand-tuned pixel.
+  */
+  var BREEDS = [
+    { h: 40, len: 48, ear: 'perk', tail: 'up', coat: '#c9a26a', trim: '#8c6a3f', voice: 300 },
+    { h: 34, len: 42, ear: 'perk', tail: 'up', coat: '#8f8a80', trim: '#5f5b53', voice: 340 },
+    { h: 57, len: 70, ear: 'flop', tail: 'long', coat: '#3a3238', trim: '#221d24', voice: 132 },
+    { h: 55, len: 68, ear: 'flop', tail: 'long', coat: '#d9b071', trim: '#a97f45', voice: 140 },
+    { h: 26, len: 64, ear: 'flop', tail: 'long', coat: '#7a4526', trim: '#4e2b17', voice: 265 },
+    { h: 45, len: 50, ear: 'flop', tail: 'puff', coat: '#efe6d6', trim: '#c6b8a2', voice: 230 },
+    { h: 50, len: 58, ear: 'perk', tail: 'up', coat: '#5c4632', trim: '#382a1d', voice: 168 }
+  ];
+  var LEASHES = ['#c4453a', '#3f9d92', '#2f3a4d', '#e8b02a'];
+  var DOG_CHANCE = 0.17;
+
+  /*
+    Kept as its own function so the whole feature can be switched off at one
+    call site - and so the roll happens after the walker is fully built, where
+    it cannot shift any of their own choices.
+  */
+  function maybeDog(p) {
+    if (p.boss || Math.random() > DOG_CHANCE) return null;
+    var br = BREEDS[Math.floor(Math.random() * BREEDS.length)];
+    return {
+      br: br,
+      lead: 20,
+      phase: Math.random() * 6.28,
+      seed: Math.random() * 6.28,
+      sniff: 0,
+      sniffT: 2 + Math.random() * 6,
+      bark: 0,
+      saw: p.mode,
+      leash: pick(LEASHES),
+      hx: null,
+      hy: null
+    };
+  }
 
   function pick(list) {
     return list[Math.floor(Math.random() * list.length)];
@@ -1658,7 +1742,7 @@ window.TossitArcade.boot = function (root) {
     /* only smooth heads are landable, so that decides who is a target */
     var bald = boss ? true : (fem ? Math.random() < 0.4 : Math.random() < 0.62);
 
-    return {
+    var p = {
       id: ++pedSeq,
       boss: !!boss,
       fem: fem,
@@ -1695,6 +1779,9 @@ window.TossitArcade.boot = function (root) {
       darts: [],
       anger: 0
     };
+
+    p.dog = maybeDog(p);
+    return p;
   }
 
   /* a pedestrian already at street depth, walking on from past the frame */
@@ -1861,6 +1948,17 @@ window.TossitArcade.boot = function (root) {
     ctx.beginPath();
     ctx.arc(nearHand.x, nearHand.y, armW * 0.5, 0, Math.PI * 2);
     inked(p.skin, lw * 0.7);
+
+    /*
+      Hand the leash its anchor while we still know where the fist is. It has
+      to be un-leaned by hand: the dog is drawn outside this rotation, so the
+      raw hand position would sit off the wrist by the width of the lean.
+    */
+    if (p.dog) {
+      var lc = Math.cos(lean), ls = Math.sin(lean);
+      p.dog.hx = feet.x + (nearHand.x - feet.x) * lc - (nearHand.y - feet.y) * ls;
+      p.dog.hy = feet.y + (nearHand.x - feet.x) * ls + (nearHand.y - feet.y) * lc;
+    }
 
     if (p.bag && hr > 6) {
       ctx.beginPath();
@@ -2989,6 +3087,234 @@ window.TossitArcade.boot = function (root) {
     ctx.restore();
   }
 
+  /* ---------------------------------------------------------- the dog */
+
+  function updateDog(p, dt) {
+    var d = p.dog;
+    var busy = d.sniff > 0 ? 0.14 : 1;
+    d.phase += dt * (p.mode === 'flee' ? 17 : 9.5) * busy;
+    if (d.bark > 0) d.bark = Math.max(0, d.bark - dt);
+
+    /*
+      A dart in his owner's dome gets exactly the reaction you would expect.
+      Watching for the change here, rather than barking from the scoring code,
+      keeps the whole animal out of the way of how points are counted.
+    */
+    if (p.mode !== d.saw) {
+      if (d.saw === 'walk' && (p.mode === 'mad' || p.mode === 'flee')) {
+        d.bark = 0.9;
+        d.sniff = 0;
+        if (state !== 'idle') sfxBark(d.br.voice);
+      }
+      d.saw = p.mode;
+    }
+
+    if (p.mode === 'walk') {
+      if (d.sniff > 0) {
+        d.sniff -= dt;
+      } else {
+        d.sniffT -= dt;
+        if (d.sniffT <= 0) {
+          d.sniff = 0.8 + Math.random() * 1.7;
+          d.sniffT = 6 + Math.random() * 8;
+        }
+      }
+    } else {
+      d.sniff = 0;
+    }
+
+    /*
+      Everything the dog does is one number: how far ahead of the owner it is.
+      Out front on a loose leash normally, dragged out further when he bolts,
+      and falling behind whenever a lamppost turns out to be interesting.
+    */
+    var want = p.mode === 'flee' ? 64
+      : d.sniff > 0 ? -36
+        : 22 + Math.sin(d.phase * 0.3 + d.seed) * 15;
+    d.lead += (want - d.lead) * Math.min(1, dt * (d.sniff > 0 ? 2.4 : 3.4));
+  }
+
+  function dogWorld(p) {
+    var d = p.dog;
+    /* always nearer than its owner, so the owner is drawn first and the
+       leash anchor is never a frame stale */
+    var dz = p.z - 26;
+    var dx = p.x + p.dir * d.lead;
+    /*
+      The park wall is painted into the static backdrop with a gap for the
+      path, so anything standing behind it paints straight over the stonework.
+      The crowd never showed that up because they all come down the gap - but
+      the dog is offset sideways from its owner, so the dog is the one that
+      can wander out over the wall. Keep it inside the gap until it is past.
+    */
+    if (dz > WALL_Z - 60) {
+      var lim = PATH_HALF - 26;
+      dx = Math.max(-lim, Math.min(lim, dx));
+    }
+    return { x: dx, z: dz };
+  }
+
+  function drawDog(p, time) {
+    var d = p.dog;
+    var br = d.br;
+    var w = dogWorld(p);
+    var sc = focal / Math.max(w.z, 1);
+    var at = proj(w.x, STREET_Y, w.z);
+    var dir = p.dir;
+    var lw = Math.max(0.6, 2.2 * sc);
+    var bh = br.h * sc;                 /* shoulder height on screen */
+    var bl = br.len * sc;               /* nose to rump */
+    var gait = d.sniff > 0 ? 0.18 : (p.mode === 'flee' ? 1.15 : 0.62);
+    var bounce = Math.abs(Math.sin(d.phase)) * bh * 0.035 * gait;
+
+    /* head drops to the pavement mid-sniff and snaps up to bark */
+    var down = d.sniff > 0 ? 1 : 0;
+    var up = d.bark > 0 ? 1 : 0;
+    var headX = at.x + dir * bl * 0.5;
+    var headY = at.y - bh * (0.96 - down * 0.42 + up * 0.1) - bounce;
+    var backY = at.y - bh * 0.74 - bounce;
+
+    ctx.save();
+
+    /* contact shadow, same trick the crowd uses */
+    ctx.beginPath();
+    ctx.ellipse(at.x, at.y, bl * 0.42, bh * 0.1, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fill();
+
+    /* far pair of legs first, darkened, so the barrel reads as solid */
+    var legY = at.y - bh * 0.02;
+    for (var side = 0; side < 2; side++) {
+      var far = side === 0;
+      var lg = far ? shade(br.coat, -0.3) : br.coat;
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = Math.max(1, bh * 0.1);
+      ctx.lineCap = 'round';
+      for (var leg = 0; leg < 2; leg++) {
+        var front = leg === 0;
+        var hipX = at.x + dir * (front ? bl * 0.28 : -bl * 0.3);
+        var sw = Math.sin(d.phase + (front ? 0 : 2.1) + (far ? Math.PI : 0)) * gait * 0.5;
+        var topY = at.y - bh * (front ? 0.62 : 0.6) - bounce;
+        ctx.beginPath();
+        ctx.moveTo(hipX, topY);
+        ctx.lineTo(hipX + dir * sw * bh * 0.34, legY);
+        ctx.stroke();
+      }
+      if (far) {
+        /* the barrel goes on between the two pairs */
+        ctx.beginPath();
+        ctx.ellipse(at.x, backY, bl * 0.42, bh * 0.25, 0, 0, Math.PI * 2);
+        inked(br.coat, lw);
+        ctx.beginPath();
+        ctx.ellipse(at.x - dir * bl * 0.1, backY + bh * 0.12, bl * 0.3, bh * 0.13, 0, 0, Math.PI * 2);
+        ctx.fillStyle = shade(br.trim, 0.18);
+        ctx.fill();
+      }
+    }
+
+    /* tail */
+    ctx.strokeStyle = br.coat;
+    ctx.lineWidth = Math.max(1, bh * (br.tail === 'puff' ? 0.07 : 0.09));
+    ctx.lineCap = 'round';
+    var wag = Math.sin(time * (d.bark > 0 ? 16 : 7) + d.seed) * (d.sniff > 0 ? 0.15 : 0.4);
+    var tx = at.x - dir * bl * 0.42;
+    var ty = backY - bh * 0.06;
+    var tipX = tx - dir * bl * (br.tail === 'long' ? 0.3 : 0.16);
+    var tipY = ty - bh * (br.tail === 'long' ? 0.1 : 0.5) + wag * bh * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo(tx - dir * bl * 0.1, ty - bh * 0.32, tipX, tipY);
+    ctx.stroke();
+    if (br.tail === 'puff') {
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, bh * 0.11, 0, Math.PI * 2);
+      inked(br.coat, lw * 0.7);
+    }
+
+    /* neck, then head */
+    ctx.strokeStyle = br.coat;
+    ctx.lineWidth = Math.max(1, bh * 0.17);
+    ctx.beginPath();
+    ctx.moveTo(at.x + dir * bl * 0.3, backY - bh * 0.08);
+    ctx.lineTo(headX, headY + bh * 0.12);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(headX, headY, bh * 0.2, bh * 0.17, 0, 0, Math.PI * 2);
+    inked(br.coat, lw);
+
+    /* muzzle, angled down when sniffing and open when barking */
+    var mx = headX + dir * bh * 0.24;
+    var my = headY + bh * (down ? 0.12 : 0.04);
+    ctx.beginPath();
+    ctx.ellipse(mx, my, bh * 0.14, bh * 0.09, 0, 0, Math.PI * 2);
+    inked(shade(br.coat, 0.16), lw * 0.8);
+    ctx.beginPath();
+    ctx.arc(mx + dir * bh * 0.11, my - bh * 0.02, bh * 0.045, 0, Math.PI * 2);
+    inked(INK, 0);
+    if (d.bark > 0) {
+      ctx.beginPath();
+      ctx.moveTo(mx - dir * bh * 0.04, my + bh * 0.02);
+      ctx.lineTo(mx + dir * bh * 0.13, my + bh * 0.03);
+      ctx.lineTo(mx + dir * bh * 0.02, my + bh * 0.14);
+      ctx.closePath();
+      inked('#8c3b3a', lw * 0.6);
+    }
+
+    /* ear */
+    var ex = headX - dir * bh * 0.06;
+    if (br.ear === 'perk') {
+      ctx.beginPath();
+      ctx.moveTo(ex - bh * 0.09, headY - bh * 0.1);
+      ctx.lineTo(ex + bh * 0.02, headY - bh * 0.36);
+      ctx.lineTo(ex + bh * 0.11, headY - bh * 0.08);
+      ctx.closePath();
+      inked(shade(br.trim, 0.05), lw * 0.8);
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(ex, headY + bh * 0.06, bh * 0.08, bh * 0.19, dir * 0.2, 0, Math.PI * 2);
+      inked(shade(br.trim, 0.05), lw * 0.8);
+    }
+
+    /* eye */
+    ctx.beginPath();
+    ctx.arc(headX + dir * bh * 0.06, headY - bh * 0.03, bh * 0.035, 0, Math.PI * 2);
+    inked(INK, 0);
+
+    /* collar, and the leash back up to the fist */
+    ctx.strokeStyle = d.leash;
+    ctx.lineWidth = Math.max(1, bh * 0.06);
+    var cx2 = at.x + dir * bl * 0.38;
+    var cy2 = backY - bh * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(cx2 - dir * bh * 0.08, cy2 - bh * 0.06);
+    ctx.lineTo(cx2 + dir * bh * 0.06, cy2 + bh * 0.1);
+    ctx.stroke();
+
+    if (d.hx != null) {
+      /*
+        The slack is the whole joke: it hangs in a loop while the dog trots
+        along and pulls dead straight the moment he stops to sniff.
+      */
+      var dx2 = cx2 - d.hx;
+      var dy2 = cy2 - d.hy;
+      var span = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      var reach = (bl * 1.9 + bh * 1.2);
+      var slack = Math.max(0, 1 - span / Math.max(1, reach));
+      ctx.lineWidth = Math.max(0.8, bh * 0.045);
+      ctx.beginPath();
+      ctx.moveTo(d.hx, d.hy);
+      ctx.quadraticCurveTo(
+        (d.hx + cx2) * 0.5,
+        (d.hy + cy2) * 0.5 + slack * (bh * 0.6 + span * 0.16),
+        cx2, cy2
+      );
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   function tryGust() {
     var pool = [];
     for (var i = 0; i < peds.length; i++) {
@@ -3542,6 +3868,8 @@ window.TossitArcade.boot = function (root) {
     c.hatPop = 0;
     c.darts = [];
     c.anger = 0;
+    /* nobody brings the dog to an arrest */
+    c.dog = null;
     return c;
   }
 
@@ -3735,6 +4063,7 @@ window.TossitArcade.boot = function (root) {
       var p = peds[i];
       if (p.mode === 'cop') continue;
       p.phase += dt * (p.mode === 'flee' ? 11 : 4.2);
+      if (p.dog) updateDog(p, dt);
 
       if (p.mode === 'mad') {
         p.timer -= dt;
@@ -4571,9 +4900,12 @@ window.TossitArcade.boot = function (root) {
 
     drawUfo(time);
 
-    /* one depth-sorted pass so traffic, crowd and rat overlap correctly */
+    /* one depth-sorted pass so traffic, crowd, dogs and rat overlap correctly */
     var order = [];
-    for (var pi = 0; pi < peds.length; pi++) order.push({ z: peds[pi].z, ped: peds[pi] });
+    for (var pi = 0; pi < peds.length; pi++) {
+      order.push({ z: peds[pi].z, ped: peds[pi] });
+      if (peds[pi].dog) order.push({ z: dogWorld(peds[pi]).z, dog: peds[pi] });
+    }
     for (var ci2 = 0; ci2 < cars.length; ci2++) order.push({ z: cars[ci2].z, car: cars[ci2] });
     if (rat) order.push({ z: rat.z, rat: true });
     order.sort(function (a, b) { return b.z - a.z; });
@@ -4584,6 +4916,8 @@ window.TossitArcade.boot = function (root) {
         if (op.mode === 'cop') {
           drawCopArm(op, op === copA ? raiseL : raiseR, op === copA ? swingL : swingR);
         }
+      } else if (order[oi].dog) {
+        drawDog(order[oi].dog, time);
       } else if (order[oi].rat) {
         drawRat(time);
       } else {
