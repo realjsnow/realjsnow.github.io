@@ -60,6 +60,8 @@ window.TossitArcade.boot = function (root) {
   /* ---------------------------------------------------------- state */
 
   var W = 0, H = 0, DPR = 1, focal = 800, cx = 0, cy = 0, horizon = 0;
+  /* which HUD the last frame drew, so the class only flips on a real change */
+  var hudIsTall = null;
   var reduceMotion = false;
   try {
     reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2539,25 +2541,40 @@ window.TossitArcade.boot = function (root) {
 
   /* ---------------------------------------------------------- the dart */
 
+  /*
+    Proportions taken off the product shots rather than eyeballed. The old
+    silhouette flared to 0.45 of its length at the tail and 0.38 at the cup,
+    which read as a trumpet or a bowtie; a real Tossit is a spool — the cup and
+    the fin mouth are the same width, both about 0.30 of the length, joined by
+    a thin shaft with a chunky embossed collar a third of the way up. Getting
+    the two ends equal is what makes it read as the actual dart.
+  */
   function dartPath(ctx2, L) {
     var u = function (v) { return v * L; };
     ctx2.beginPath();
-    ctx2.moveTo(u(0.0), -u(0.19));
-    ctx2.lineTo(u(0.022), -u(0.19));
-    ctx2.bezierCurveTo(u(0.05), -u(0.105), u(0.075), -u(0.06), u(0.115), -u(0.048));
-    ctx2.lineTo(u(0.235), -u(0.045));
-    ctx2.quadraticCurveTo(u(0.244), -u(0.093), u(0.295), -u(0.093));
-    ctx2.quadraticCurveTo(u(0.346), -u(0.093), u(0.358), -u(0.048));
-    ctx2.lineTo(u(0.745), -u(0.04));
-    ctx2.quadraticCurveTo(u(0.9), -u(0.058), u(1.0), -u(0.225));
-    ctx2.lineTo(u(1.0), u(0.225));
-    ctx2.quadraticCurveTo(u(0.9), u(0.058), u(0.745), u(0.04));
-    ctx2.lineTo(u(0.358), u(0.048));
-    ctx2.quadraticCurveTo(u(0.346), u(0.093), u(0.295), u(0.093));
-    ctx2.quadraticCurveTo(u(0.244), u(0.093), u(0.235), u(0.045));
-    ctx2.lineTo(u(0.115), u(0.048));
-    ctx2.bezierCurveTo(u(0.075), u(0.06), u(0.05), u(0.105), u(0.022), u(0.19));
-    ctx2.lineTo(u(0.0), u(0.19));
+    /* suction cup: flat rim, concave underside drawn back into the shaft */
+    ctx2.moveTo(u(0.0), -u(0.152));
+    ctx2.lineTo(u(0.020), -u(0.152));
+    ctx2.bezierCurveTo(u(0.052), -u(0.140), u(0.074), -u(0.078), u(0.098), -u(0.046));
+    /* shaft up to the collar */
+    ctx2.lineTo(u(0.238), -u(0.043));
+    /* the embossed TOSSIT collar: a moulded band with straight shoulders */
+    ctx2.lineTo(u(0.252), -u(0.112));
+    ctx2.lineTo(u(0.344), -u(0.112));
+    ctx2.lineTo(u(0.356), -u(0.044));
+    /* the long tapering shaft */
+    ctx2.lineTo(u(0.660), -u(0.040));
+    /* the fin cone: a trumpet, slightly concave, opening to the cup's width */
+    ctx2.bezierCurveTo(u(0.800), -u(0.052), u(0.918), -u(0.086), u(1.0), -u(0.152));
+    ctx2.lineTo(u(1.0), u(0.152));
+    ctx2.bezierCurveTo(u(0.918), u(0.086), u(0.800), u(0.052), u(0.660), u(0.040));
+    ctx2.lineTo(u(0.356), u(0.044));
+    ctx2.lineTo(u(0.344), u(0.112));
+    ctx2.lineTo(u(0.252), u(0.112));
+    ctx2.lineTo(u(0.238), u(0.043));
+    ctx2.lineTo(u(0.098), u(0.046));
+    ctx2.bezierCurveTo(u(0.074), u(0.078), u(0.052), u(0.140), u(0.020), u(0.152));
+    ctx2.lineTo(u(0.0), u(0.152));
     ctx2.closePath();
   }
 
@@ -2586,20 +2603,38 @@ window.TossitArcade.boot = function (root) {
     ctx2.fillStyle = vol;
     ctx2.fillRect(-u(0.06), -u(0.3), u(1.14), u(0.6));
 
+    /* the hollow of the fin cone, following the new flare */
     ctx2.fillStyle = 'rgba(0,0,0,0.22)';
     ctx2.beginPath();
-    ctx2.moveTo(u(0.75), -u(0.02));
-    ctx2.quadraticCurveTo(u(0.9), -u(0.03), u(1.0), -u(0.088));
-    ctx2.lineTo(u(1.0), u(0.088));
-    ctx2.quadraticCurveTo(u(0.9), u(0.03), u(0.75), u(0.02));
+    ctx2.moveTo(u(0.68), -u(0.020));
+    ctx2.quadraticCurveTo(u(0.86), -u(0.030), u(1.0), -u(0.062));
+    ctx2.lineTo(u(1.0), u(0.062));
+    ctx2.quadraticCurveTo(u(0.86), u(0.030), u(0.68), u(0.020));
     ctx2.closePath();
     ctx2.fill();
 
-    ctx2.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx2.fillRect(u(0.252), -u(0.017), u(0.082), Math.max(0.7, u(0.031)));
+    /*
+      The vane you can see standing up inside the cone on the real dart. Only
+      worth drawing once the dart is big enough for it to be more than a pixel.
+    */
+    if (L > 46) {
+      ctx2.strokeStyle = 'rgba(0,0,0,0.26)';
+      ctx2.lineWidth = Math.max(0.8, L * 0.016);
+      ctx2.beginPath();
+      ctx2.moveTo(u(0.70), 0);
+      ctx2.lineTo(u(0.985), 0);
+      ctx2.stroke();
+    }
 
+    /* the collar reads as a raised band: shadow under it, light on top */
+    ctx2.fillStyle = 'rgba(0,0,0,0.26)';
+    ctx2.fillRect(u(0.246), u(0.030), u(0.108), Math.max(0.7, u(0.070)));
+    ctx2.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx2.fillRect(u(0.246), -u(0.098), u(0.108), Math.max(0.7, u(0.030)));
+
+    /* the wet-looking rim of the suction cup */
     ctx2.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx2.fillRect(-u(0.004), -u(0.19), Math.max(0.9, u(0.028)), u(0.38));
+    ctx2.fillRect(-u(0.004), -u(0.152), Math.max(0.9, u(0.026)), u(0.304));
 
     ctx2.restore();
 
@@ -2688,7 +2723,8 @@ window.TossitArcade.boot = function (root) {
 
     ctx.save();
     ctx.translate(mid.x + hx, mid.y + hy);
-    finRosette(ctx, Math.max(1.2, thick * 0.235), color, roll);
+    /* matches the fin mouth in the side profile, which is now the cup's width */
+    finRosette(ctx, Math.max(1.2, thick * 0.158), color, roll);
     ctx.restore();
 
     if (L > thick * 0.16) {
@@ -3245,7 +3281,9 @@ window.TossitArcade.boot = function (root) {
       var baseX = T.x, baseZ = T.z;
       var vx = 0, vz = 0;
       if (lp.mode === 'flee') {
-        vx = lp.dir * lp.speed * 3.6;
+        /* matches the two halves of the runner's path in update() */
+        if (lp.z > lp.turnZ) vz = -lp.speed * 3.6;
+        else vx = lp.dir * lp.speed * 3.6;
       } else if (lp.mode === 'walk') {
         if (lp.stage === 'approach') vz = -lp.speed * 2.6;
         else vx = lp.dir * lp.speed;
@@ -3707,7 +3745,20 @@ window.TossitArcade.boot = function (root) {
         }
       } else if (p.mode === 'flee') {
         p.anger = Math.max(0, p.anger - dt * 0.35);
-        p.x += p.dir * p.speed * 3.6 * dt;
+        /*
+          The park wall is painted into the static backdrop, so anybody drawn
+          while standing behind it paints straight over it. Walkers never
+          showed that up because they come down the path inside the gap in the
+          wall, but a runner used to sprint sideways at whatever park depth he
+          was stuck at — across the wall, on top of it. He bolts out to the
+          pavement first now, which is both the right depth to run at and what
+          a person would actually do.
+        */
+        if (p.z > p.turnZ) {
+          p.z = Math.max(p.turnZ, p.z - p.speed * 3.6 * dt);
+        } else {
+          p.x += p.dir * p.speed * 3.6 * dt;
+        }
       } else if (p.stage === 'approach') {
         p.z -= p.speed * 2.6 * dt;
         if (p.z <= p.turnZ) {
@@ -4278,6 +4329,17 @@ window.TossitArcade.boot = function (root) {
     var big = Math.max(15, Math.round(W * 0.03));
     var small = Math.max(9, Math.round(W * 0.014));
     var tall = H > W * 1.15;
+
+    /*
+      The sound button is DOM, not canvas, so it cannot see which HUD the
+      renderer picked. Publish it: on the scoreboard layout the button has to
+      leave the bottom-left corner the scoreboard now owns. Only touched when
+      it flips, so this is not a per-frame class write.
+    */
+    if (tall !== hudIsTall) {
+      hudIsTall = tall;
+      root.classList.toggle('ta-hud-bottom', tall);
+    }
 
     ctx.save();
     ctx.textBaseline = 'top';

@@ -147,6 +147,22 @@
     gap: 6px;
   }
 
+  /*
+    On a tall canvas the HUD becomes the bottom scoreboard, and the corner the
+    sound button sits in is the one strip the scoreboard wants — plus the strip
+    iOS Safari parks its toolbar over. The renderer flags that layout, so the
+    control moves to the free corner opposite the close button and lies down
+    flat instead of stacking. Driven by the layout the renderer actually chose,
+    not a width guess: a short landscape window under 749px keeps the corner HUD
+    top-left, and a media query would have collided with it.
+  */
+  .tossit-arcade .ta-machine.ta-hud-bottom .ta-sound-wrap {
+    top: 12px;
+    bottom: auto;
+    flex-direction: row;
+    align-items: center;
+  }
+
   .tossit-arcade .ta-sound__label {
     padding: 3px 9px;
     border-radius: 999px;
@@ -533,6 +549,13 @@
 .tossit-arcade .ta-machine.ta-lightbox-open {
   position: fixed;
   inset: 0;
+  /*
+    iOS Safari sizes a fixed element to the *large* viewport, so with the
+    toolbar showing the bottom of the game — the scoreboard and the sound
+    button — sat underneath it. dvh is the visible box. Browsers that do not
+    know dvh drop the line and keep the inset: 0 behaviour.
+  */
+  height: 100dvh;
   z-index: 2147483000;
   background: #17141b;
 }
@@ -563,6 +586,21 @@
   .tossit-arcade .ta-machine.ta-lightbox-open .ta-close {
     top: calc(10px + env(safe-area-inset-top));
     right: calc(10px + env(safe-area-inset-right));
+  }
+
+  /*
+    The close button got the notch treatment when the lightbox landed and the
+    sound control never did, so it kept sitting in the home-indicator strip.
+    Both fullscreen paths, both placements.
+  */
+  .tossit-arcade .ta-machine.ta-lightbox-open .ta-sound-wrap {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: calc(12px + env(safe-area-inset-left));
+  }
+
+  .tossit-arcade .ta-machine.ta-lightbox-open.ta-hud-bottom .ta-sound-wrap {
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
   }
 }
 
@@ -805,6 +843,8 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
+  /* same reason as the lightbox fallback: dvh excludes Safari's toolbar */
+  height: 100dvh;
   max-width: none;
   max-height: none;
   margin: 0;
@@ -864,6 +904,105 @@
   width: min(46vw, 200px);
   margin: 0 auto 6px;
   animation: ta-head-float 3.2s ease-in-out infinite;
+}
+
+/*
+  46vw is the viewport, which has nothing to do with the box the head has to
+  fit in. On a phone the inline playfield is a square about 309px tall while
+  46vw is 172px wide, so the head plus the copy plus the button came to ~357px
+  and the panel hung out of both ends of the screen — the dome clipped at the
+  top, "Best" cut off at the bottom. Size it against the screen itself: cqh
+  keeps the whole panel inside a short playfield, cqw keeps it sane on a wide
+  one, and the 200px cap is the old desktop size unchanged.
+*/
+@supports (container-type: size) {
+  .tossit-arcade .ta-screen {
+    container-type: size;
+    container-name: ta-screen;
+  }
+
+  /*
+    Shrinking the head alone was not enough: on a 320px phone the playfield is
+    a 254px square while the panel's padding, copy, button and footer are fixed
+    pixel sizes that add up to more than that on their own. Everything inside
+    the panel scales off the playfield's own height, so the start and game-over
+    panels fit whatever box they are given. Every clamp ceiling is the value
+    the rule already had, so a roomy playfield renders exactly as before; the
+    tighter line-height is the one deliberate change, and it buys the phone
+    case a line of slack.
+  */
+  @container ta-screen (min-height: 0px) {
+    /*
+      A short playfield spends most of its height on the copy and the button,
+      so the head gets a small share of it. Two branches rather than one
+      fraction: 32cqh on a 254px square would put the head straight back
+      through the top of the screen.
+    */
+    .tossit-arcade .ta-headsup {
+      width: min(46cqw, 26cqh, 200px);
+    }
+
+    .tossit-arcade .ta-panel {
+      padding: clamp(12px, 4.5cqh, 28px) clamp(14px, 5cqw, 32px);
+    }
+
+    .tossit-arcade .ta-panel__body {
+      font-size: clamp(11px, 4.6cqh, 14px);
+      line-height: 1.5;
+      margin-bottom: clamp(9px, 3.4cqh, 20px);
+    }
+
+    .tossit-arcade .ta-panel .ta-btn {
+      padding: clamp(9px, 3cqh, 14px) clamp(18px, 7cqw, 32px);
+      font-size: clamp(10px, 2.7cqh, 13px);
+    }
+
+    .tossit-arcade .ta-panel__foot {
+      font-size: clamp(9px, 2.6cqh, 11px);
+    }
+
+    .tossit-arcade .ta-rank {
+      margin-bottom: clamp(4px, 1.8cqh, 10px);
+      padding: clamp(3px, 1.4cqh, 5px) clamp(9px, 3cqw, 14px);
+      font-size: clamp(9px, 2.4cqh, 11px);
+    }
+
+    /* the end panel's big number, which has no head to scale against. The
+       start title is excluded: it scales off the dome it sits on, not the
+       playfield, and this selector would otherwise outrank that rule. */
+    .tossit-arcade .ta-panel__title:not(.ta-headsup__title) {
+      font-size: clamp(26px, 13cqh, 56px);
+      margin-bottom: clamp(5px, 2cqh, 10px);
+    }
+  }
+
+  /*
+    Once the playfield is tall enough for the copy to stop dominating, the head
+    takes a bigger share again — otherwise a desktop panel wastes 60px of empty
+    card under a shrunken mascot.
+  */
+  @container ta-screen (min-height: 320px) {
+    .tossit-arcade .ta-headsup {
+      width: min(46cqw, 32cqh, 200px);
+    }
+  }
+
+  /*
+    The title rides across the dome, so it has to scale with the head rather
+    than with the viewport — a vw-based size on a head that is no longer
+    vw-sized just spills off the face. Tuned so the word sits inside the dome
+    (2 x rx = 78% of the head box) in the theme's condensed heading face.
+  */
+  .tossit-arcade .ta-headsup {
+    container-type: inline-size;
+    container-name: ta-head;
+  }
+
+  @container ta-head (min-width: 0px) {
+    .tossit-arcade .ta-headsup__title {
+      font-size: 17cqw;
+    }
+  }
 }
 
 .tossit-arcade .ta-headsup__svg {
